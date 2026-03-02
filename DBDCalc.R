@@ -345,6 +345,62 @@ Porosity_plot=ggplot(DBD_table, aes(x = `Porosity`, y = `Mid Depth z(i) (cm)`)) 
 print(Porosity_plot)
 dev.off()
 }
+
+constants_table <- data.frame(
+  constant = c(
+    "core diameter (cm)",
+    "core diameter uncertainty (cm)",
+    "surface area (cm^2)",
+    "surface area uncertainty (cm^2)",
+    "interval thickness (cm)",
+    "full core length (cm)",
+    "particle density (g/cm^3)",
+    "particle density uncertainty (g/cm^3)"
+  ),
+  value = I(vector("list", 8)),   # list-column
+  stringsAsFactors = FALSE
+)
+
+# 2) Fill in scalar entries as 1-length numerics
+constants_table$value[[1]]  <- internal_diameter
+constants_table$value[[2]]  <- internal_diameter_uncer
+constants_table$value[[3]]  <- surface_area
+constants_table$value[[4]]  <- surface_area_uncer
+
+# 3) This row can now hold a numeric vector (float list)
+if (exists("interval_thicknesses_list")) {
+  constants_table$value[[5]]  <- interval_thicknesses_list   # vector allowed here
+} else {
+  constants_table$value[[5]]  <- interval_thickness
+}
+
+constants_table$value[[6]] <- core_length
+constants_table$value[[7]] <- particle_density
+constants_table$value[[8]] <- particle_density_uncer
+
+# 4) Make a CSV-friendly copy (so write.csv still works cleanly)
+constants_table_csv <- constants_table
+
+constants_table_csv$value <- vapply(
+  constants_table$value,
+  function(x) {
+    # x might be a numeric, or a list element containing a numeric/vector
+    if (is.list(x)) {
+      x <- unlist(x, recursive = FALSE, use.names = FALSE)
+    }
+    # Now x is atomic: length 1 (scalar) or >1 (vector)
+    if (length(x) <= 1) {
+      as.character(x)
+    } else {
+      paste(x, collapse = ";")  # works for either case
+    }
+  },
+  character(1)
+)
+
+write.csv(constants_table, "constants_table", row.names=FALSE)
+
+
 save.image(file = "DBD_environment.RData")
 
 rm(list = ls(all.names = TRUE))
