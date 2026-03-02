@@ -152,7 +152,7 @@ if (wet_weights ==TRUE & has_debris==FALSE){
   }else{
     particle_density=2.65
     print("default Particle Density used, 2.65 g/cm^3")
-    particle_density_uncer=0.01
+    particle_density_uncer=0.05
   }
   DBD_table[,2:5]=mass_dat[,1:4]
   DBD_table[,6]=DBD_table[,2]-DBD_table[,4]
@@ -205,7 +205,7 @@ if (wet_weights ==TRUE & has_debris==FALSE){
   }else{
     particle_density=2.65
     print("default Particle Density used, 2.65 g/cm^3")
-    particle_density_uncer=0.01
+    particle_density_uncer=0.05
   }
   if (has_debris==TRUE){
     #don't execute porosity calculations
