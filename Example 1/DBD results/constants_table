@@ -1,0 +1,9 @@
+"constant","value"
+"core diameter (cm)",10
+"core diameter uncertainty (cm)",0.1
+"surface area (cm^2)",78.5398163397448
+"surface area uncertainty (cm^2)",1.5707963267949
+"interval thickness (cm)",1
+"full core length (cm)",30
+"particle density (g/cm^3)",2.65
+"particle density uncertainty (g/cm^3)",0.1
