@@ -150,6 +150,12 @@ if (wet_weights ==TRUE & has_debris==FALSE){
     particle_density= as.numeric(readline(prompt = "Enter Particle Density (g/cm^3) "))
     particle_density_uncer= as.numeric(readline(prompt = "Enter Particle Density Uncertainty (g/cm^3) "))
   }else{
+    has_clay = readline(prompt = "Do you have a percent clay? (True or False) ")
+    if (has_clay==TRUE){
+      clay_per=as.numeric(readline(prompt = "Enter Clay Percentage (%) "))
+      particle_density=2.652+0.216*(clay_per/100)
+      particle_density_uncer=0.041
+    }
     particle_density=2.65
     print("default Particle Density used, 2.65 g/cm^3")
     particle_density_uncer=0.1
@@ -203,6 +209,12 @@ if (wet_weights ==TRUE & has_debris==FALSE){
     particle_density= as.numeric(readline(prompt = "Enter Particle Density (g/cm^3) "))
     particle_density_uncer= as.numeric(readline(prompt = "Enter Particle Density Uncertainty (g/cm^3) "))
   }else{
+    has_clay = readline(prompt = "Do you have a percent clay? (True or False) ")
+    if (has_clay==TRUE){
+      clay_per=as.numeric(readline(prompt = "Enter Clay Percentage (%) "))
+      particle_density=2.652+0.216*(clay_per/100)
+      particle_density_uncer=0.041
+    }
     particle_density=2.65
     print("default Particle Density used, 2.65 g/cm^3")
     particle_density_uncer=0.1
