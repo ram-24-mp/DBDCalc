@@ -214,82 +214,67 @@ if (wet_weights ==TRUE & has_debris==FALSE){
     DBD_table[,8]=DBD_table[,7]*sqrt((particle_density_uncer/particle_density)^2+(DBD_table[,10]/DBD_table[,9])^2)
   }
 }
-if (any(is.na(DBD_table$`Dry Bulk Density (g/cm^3)`))){
-  NAs_exist = readline(prompt = "Do you want to interpolate missing DBD and Porosity values? (True or False) ")
-  if (NAs_exist==TRUE){
-    
-    # Loop through the interpolated X to calculate uncertainties
-for (i in 1:nrow(DBD_table)) {
-  # Only calculate propagated uncertainty if the current uncertainty is NA
-  if (is.na(DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)`[i])) {
-    # Find the nearest known X on both sides
-    left_index <- i - 1
-    while (left_index > 0 && (is.na(DBD_table$`Dry Bulk Density (g/cm^3)`[left_index]) || is.na(DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)`[left_index]))) {
-      left_index <- left_index - 1
-    }
-    
-    right_index <- i + 1
-    while (right_index < nrow(DBD_table) && (is.na(DBD_table$`Dry Bulk Density (g/cm^3)`[right_index]) || is.na(DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)`[right_index]))) {
-      right_index <- right_index + 1
-    }
-    
-    # Check if we found valid indices
-    if (left_index > 0 && right_index < nrow(DBD_table)) {
-      delta_y1 <- DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)`[left_index]  # Use the correct column for uncertainties
-      x1 <- left_index
-      delta_y2 <- DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)`[right_index]  # Use the correct column for uncertainties
-      x2 <- right_index
-      partial_der=(i-x1)/(x2-x1)
+# Fill missing uncertainties by bracketing nearest known uncertainty values
+propagate_uncertainty_linear <- function(u) {
+  n <- length(u)
+  for (i in seq_len(n)) {
+    if (is.na(u[i])) {
+      left_index <- i - 1
+      while (left_index >= 1 && is.na(u[left_index])) {
+        left_index <- left_index - 1
+      }
       
-      # Calculate propagated uncertainty
-      propagated_uncertainty <- sqrt(((1-partial_der)*delta_y1)^2 + (partial_der * delta_y2)^2)
-      DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)`[i] <- propagated_uncertainty
+      right_index <- i + 1
+      while (right_index <= n && is.na(u[right_index])) {
+        right_index <- right_index + 1
+      }
       
-      DBD_table$`Dry Bulk Density (g/cm^3)` <- na.approx(DBD_table$`Dry Bulk Density (g/cm^3)`, na.rm = FALSE)
-      
+      # need valid brackets on BOTH sides
+      if (left_index >= 1 && right_index <= n) {
+        delta_y1 <- u[left_index]
+        delta_y2 <- u[right_index]
+        x1 <- left_index
+        x2 <- right_index
+        
+        w <- (i - x1) / (x2 - x1)  # same as your partial_der
+        u[i] <- sqrt(((1 - w) * delta_y1)^2 + (w * delta_y2)^2)
+      }
     }
   }
+  u
 }
+
+# ---- main logic ----
+if ("Dry Bulk Density (g/cm^3)" %in% names(DBD_table) &&
+    anyNA(DBD_table$`Dry Bulk Density (g/cm^3)`)) {
+  
+  ans <- tolower(trimws(readline(
+    prompt = "Do you want to interpolate missing DBD and Porosity values? (TRUE/FALSE) "
+  )))
+  do_it <- isTRUE(as.logical(ans))
+  
+  if (do_it) {
     
+    # ---- DBD ----
+    if ("Dry Bulk Density Uncertainty (g/cm^3)" %in% names(DBD_table)) {
+      DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)` <-
+        propagate_uncertainty_linear(DBD_table$`Dry Bulk Density Uncertainty (g/cm^3)`)
+    }
     
+    DBD_table$`Dry Bulk Density (g/cm^3)` <-
+      na.approx(DBD_table$`Dry Bulk Density (g/cm^3)`, na.rm = FALSE)
     
+    # ---- Porosity (only if columns exist) ----
     if ("Porosity" %in% names(DBD_table)) {
       
-      
-      # Loop through the interpolated X to calculate uncertainties
-      for (i in 1:nrow(DBD_table)) {
-        # Only calculate propagated uncertainty if the current uncertainty is NA
-        if (is.na(DBD_table$`Porosity`[i])) {
-          # Find the nearest known X on both sides
-          left_index <- i - 1
-          while (left_index > 0 && (is.na(DBD_table$`Porosity`[left_index]) || is.na(DBD_table$`Porosity Uncertainty`[left_index]))) {
-            left_index <- left_index - 1
-          }
-          
-          right_index <- i + 1
-          while (right_index < nrow(DBD_table) && (is.na(DBD_table$`Porosity`[right_index]) || is.na(DBD_table$`Porosity Uncertainty`[right_index]))) {
-            right_index <- right_index + 1
-          }
-          
-          # Check if we found valid indices
-          if (left_index > 0 && right_index < nrow(DBD_table)) {
-            delta_y1 <- DBD_table$`Porosity Uncertainty`[left_index]  # Use the correct column for uncertainties
-            x1 <- left_index
-            delta_y2 <- DBD_table$`Porosity Uncertainty`[right_index]  # Use the correct column for uncertainties
-            x2 <- right_index
-            partial_der=(i-x1)/(x2-x1)
-            
-            # Calculate propagated uncertainty
-            propagated_uncertainty <- sqrt(((1-partial_der)*delta_y1)^2 + (partial_der * delta_y2)^2)
-            DBD_table$`Porosity Uncertainty`[i] <- propagated_uncertainty
-      
+      if ("Porosity Uncertainty" %in% names(DBD_table)) {
+        DBD_table$`Porosity Uncertainty` <-
+          propagate_uncertainty_linear(DBD_table$`Porosity Uncertainty`)
+      }
       
       DBD_table$Porosity <- na.approx(DBD_table$Porosity, na.rm = FALSE)
     }
   }
-}
-}
-}
 }
 print("select destination folder")
 destination_folder <- rstudioapi::selectDirectory("Select Destination Folder")
