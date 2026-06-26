@@ -1,12 +1,180 @@
-#For updates and bug fixes, please see the actively maintained version of DBDCalc:
-#https://github.com/ram-24-mp/DBDCalc
+# For updates and bug fixes, please see the actively maintained version of DBDCalc:
+# https://github.com/ram-24-mp/DBDCalc
 
-#packages needed
-suppressPackageStartupMessages(library(readxl))
-suppressPackageStartupMessages(library(writexl))
-suppressPackageStartupMessages(library(ggplot2))
-suppressPackageStartupMessages(library(rstudioapi))
-suppressPackageStartupMessages(library(zoo))
+# script startup
+script_version <- "1.0"
+
+required_packages <- c(
+  "jsonlite",
+  "readxl",
+  "writexl",
+  "ggplot2",
+  "rstudioapi",
+  "zoo"
+)
+
+min_versions <- c(
+  rlang = "1.1.7",
+  vctrs = "0.6.5"
+)
+
+get_latest_r_version <- function() {
+  urls <- c(
+    "https://cran.r-project.org/bin/windows/base/release.htm",
+    "https://cran.r-project.org/bin/macosx/",
+    "https://cran.r-project.org/"
+  )
+  
+  for (u in urls) {
+    txt <- tryCatch(readLines(u, warn = FALSE), error = function(e) NULL)
+    if (is.null(txt)) next
+    x <- paste(txt, collapse = "\n")
+    
+    m <- regmatches(
+      x,
+      gregexpr("\\bR[- ]([0-9]+\\.[0-9]+\\.[0-9]+)\\b", x, perl = TRUE)
+    )[[1]]
+    
+    if (length(m) == 0) next
+    
+    vers <- sub("^R[- ]", "", m)
+    vers <- unique(vers[nzchar(vers)])
+    if (length(vers) == 0) next
+    
+    return(as.character(sort(numeric_version(vers), decreasing = TRUE)[1]))
+  }
+  
+  NA_character_
+}
+
+check_r_version_current <- function() {
+  current_r <- as.character(getRversion())
+  latest_r <- get_latest_r_version()
+  
+  if (is.na(latest_r) || !nzchar(latest_r)) {
+    message("Could not check whether R is up to date.")
+    return(invisible(FALSE))
+  }
+  
+  if (utils::compareVersion(current_r, latest_r) < 0) {
+    stop(
+      paste0(
+        "Your R version is out of date (current: ", current_r,
+        ", latest: ", latest_r, ").\n",
+        "Please update R, restart R, and run the script again."
+      ),
+      call. = FALSE
+    )
+  }
+  
+  message("R is up to date.")
+  invisible(TRUE)
+}
+
+check_installed_version <- function(pkg, min_version) {
+  if (!requireNamespace(pkg, quietly = TRUE)) return(FALSE)
+  utils::compareVersion(as.character(utils::packageVersion(pkg)), min_version) >= 0
+}
+
+install_missing_packages <- function(pkgs) {
+  missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+  
+  if (length(missing) == 0) return(invisible(FALSE))
+  
+  install.packages(missing, dependencies = TRUE)
+  
+  stop(
+    paste0(
+      "Installed missing packages: ",
+      paste(missing, collapse = ", "),
+      "\nPlease restart R and run the script again."
+    ),
+    call. = FALSE
+  )
+}
+
+check_outdated_packages <- function(version_requirements) {
+  outdated <- names(version_requirements)[
+    !vapply(
+      names(version_requirements),
+      function(pkg) check_installed_version(pkg, version_requirements[[pkg]]),
+      logical(1)
+    )
+  ]
+  
+  if (length(outdated) > 0) {
+    stop(
+      paste0(
+        "These packages are too old and must be updated in a fresh R session: ",
+        paste(outdated, collapse = ", "),
+        "\nRun:\n",
+        "install.packages(c(",
+        paste(sprintf('"%s"', outdated), collapse = ", "),
+        "), dependencies = TRUE)\n",
+        "Then restart R and run the script again."
+      ),
+      call. = FALSE
+    )
+  }
+  
+  invisible(TRUE)
+}
+
+load_required_packages <- function(pkgs) {
+  for (pkg in pkgs) {
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+  }
+  invisible(TRUE)
+}
+
+check_for_script_update <- function(current_version) {
+  latest_version <- tryCatch({
+    x <- jsonlite::fromJSON(
+      "https://api.github.com/repos/ram-24-mp/DBDCalc/releases/latest"
+    )
+    sub("^v", "", trimws(x$tag_name))
+  }, error = function(e) NA_character_)
+  
+  if (is.na(latest_version) || latest_version == "") {
+    message("Could not check for script updates.")
+    return(invisible(FALSE))
+  }
+  
+  if (utils::compareVersion(latest_version, current_version) > 0) {
+    message(sprintf(
+      "A newer version is available: %s (current: %s)",
+      latest_version, current_version
+    ))
+    return(invisible(TRUE))
+  }
+  
+  message("Script is up to date.")
+  invisible(FALSE)
+}
+
+check_r_version_current()
+
+if ("rlang" %in% loadedNamespaces()) {
+  loaded_rlang <- as.character(getNamespaceVersion("rlang"))
+  if (utils::compareVersion(loaded_rlang, min_versions[["rlang"]]) < 0) {
+    stop(
+      paste0(
+        "An outdated 'rlang' namespace is already loaded in this R session (",
+        loaded_rlang,
+        ").\n",
+        "Restart R before running this script.\n",
+        "Do not source this script again in the same session after updating packages.\n",
+        "Run install.packages(c(\"rlang\", \"vctrs\", \"ggplot2\"), dependencies = TRUE)"
+      ),
+      call. = FALSE
+    )
+  }
+}
+
+install_missing_packages(required_packages)
+check_outdated_packages(min_versions)
+load_required_packages(required_packages)
+check_for_script_update(script_version)
 
 rm(list = ls(all.names = TRUE))
 
@@ -14,7 +182,7 @@ interval_constant = readline(prompt = "Is your interval thickness constant (True
 
 # core dimensions, in cm
 if (interval_constant == TRUE) {
-  
+  print ("Diameter 10.0 +/- 0.1 cm")
   dim_defaults = readline(prompt = "Accept Core Dimension Defaults (True or False) ")
   
   if (dim_defaults == TRUE) {
@@ -69,7 +237,7 @@ if (interval_constant == TRUE) {
     interval_thicknesses_list[i] =
       as.numeric(readline(prompt = paste("Enter interval thickness ", i, ": ")))
   }
-  
+  print ("Diameter 10.0 +/- 0.1 cm")
   dim_defaults = readline(prompt = "Accept Core Dimension Defaults (True or False) ")
   
   if (dim_defaults == TRUE) {
@@ -139,43 +307,83 @@ if (interval_constant == TRUE) {
 }
 print("select mass data")
 file_path=file.choose()
-mass_dat=read_excel(file_path, col_names = TRUE, col_types = "numeric")
+mass_dat=read_excel(file_path, col_names = TRUE, col_types = "numeric", .name_repair = "unique_quiet")
 
 wet_weights = readline(prompt = "Do you have both wet and dry sediment weights? (True or False) ")
-has_debris= readline(prompt = "Does organic debris make any significant contribution to core sediment? (True or False) ")
 DBD_table <- as.data.frame(DBD_table, stringsAsFactors = FALSE)
-if (wet_weights ==TRUE & has_debris==FALSE){
+if (wet_weights ==TRUE){
+  constant_density = readline(prompt = "Do you assume constant particle density? (True or False) ")
+  if (constant_density==TRUE){
   has_particle_density = readline(prompt = "Do you have a measured particle density? (True or False) ")
   if (has_particle_density==TRUE){
     particle_density= as.numeric(readline(prompt = "Enter Particle Density (g/cm^3) "))
     particle_density_uncer= as.numeric(readline(prompt = "Enter Particle Density Uncertainty (g/cm^3) "))
   }else{
-    has_clay = readline(prompt = "Do you have a percent clay? (True or False) ")
+    has_clay = readline(prompt = "Do you have a weight percent clay and organic matter? (True or False) ")
     if (has_clay==TRUE){
       clay_per=as.numeric(readline(prompt = "Enter Clay Percentage (%) "))
-      particle_density=2.652+0.216*(clay_per/100)
+      OM_per=as.numeric(readline(prompt = "Enter OM Percentage (%) "))
+      particle_density=2.652+0.216*(clay_per/100)-2.237*(OM_per/100)
       particle_density_uncer=0.041
     }
     particle_density=2.65
     print("default Particle Density used, 2.65 g/cm^3")
     particle_density_uncer=0.1
   }
+  }else{
+    has_particle_density = readline(prompt = "Do you have measured particle densities? (True or False) ")
+    if (has_particle_density==TRUE){
+      print("select particle density data")
+      file_path=file.choose()
+      density_dat=read_excel(file_path, col_names = TRUE, col_types = "numeric", .name_repair = "unique_quiet")
+      DBD_table=cbind(DBD_table, "Particle Density (g/cm^3)", "Particle Density Uncertainty (g/cm^3)")
+      DBD_table[,18]=density_dat[,1]
+      DBD_table[,19]=density_dat[,2]
+    }else{
+      print("select clay and organic matter data")
+      file_path=file.choose()
+      clay_OM_dat=read_excel(file_path, col_names = TRUE, col_types = "numeric", .name_repair = "unique_quiet")
+      DBD_table=cbind(DBD_table, "Particle Density (g/cm^3)", "Particle Density Uncertainty (g/cm^3)", "Clay Weight Percent (%)", "OM Weight Percent (%)")
+      DBD_table[,20]=density_dat[,1]
+      DBD_table[,21]=density_dat[,2]
+      DBD_table[,18]=2.652+0.216*(DBD_table[,20]/100)-2.237*(DBD_table[,21]/100)
+      DBD_table[,19]=0.041
+    }
+  }
+
   DBD_table[,2:5]=mass_dat[,1:4]
   DBD_table[,6]=DBD_table[,2]-DBD_table[,4]
   DBD_table[,8]=(DBD_table[,6]/DBD_table[,2])*100
+  if (constant_density==TRUE){
   DBD_table[,10]=DBD_table[,4]/particle_density
+  }else{
+    DBD_table[,10]=DBD_table[,4]/DBD_table[,18]
+  }
   DBD_table[,12]=DBD_table[,6]
   DBD_table[,14]=(DBD_table[,12]/(DBD_table[,10]+DBD_table[,12]))
-  DBD_table[,16]=(1-DBD_table[,14])*particle_density
+  if (constant_density==TRUE){
+    DBD_table[,16]=(1-DBD_table[,14])*particle_density
+  }else{
+    DBD_table[,16]=(1-DBD_table[,14])*DBD_table[,18]
+  }
+  
   
   #uncertainties
   DBD_table[,7]=sqrt(DBD_table[,3]^2+DBD_table[,5]^2)
   DBD_table[,9]=DBD_table[,8]*sqrt((DBD_table[,7]/DBD_table[,6])^2+(DBD_table[,3]/DBD_table[,2])^2)
+  if (constant_density==TRUE){
   DBD_table[,11]=DBD_table[,10]*sqrt((DBD_table[,5]/DBD_table[,4])^2+(particle_density_uncer/particle_density)^2)
+  }else{
+    DBD_table[,11]=DBD_table[,10]*sqrt((DBD_table[,5]/DBD_table[,4])^2+(DBD_table[,19]/DBD_table[,18])^2)
+  }
   DBD_table[,13]=DBD_table[,7]
   #verify all uncertainties with Brent, but particularly the following two
   DBD_table[,15]=DBD_table[,14] * (DBD_table[,10]/(DBD_table[,10]+DBD_table[,12])) * sqrt((DBD_table[,11]/DBD_table[,10])^2+(DBD_table[,13]/DBD_table[,12])^2)
+  if (constant_density==TRUE){
   DBD_table[,17]=DBD_table[,16]*sqrt((DBD_table[,15]/(1-DBD_table[,14]))^2+(particle_density_uncer/particle_density)^2)
+  }else{
+    DBD_table[,17]=DBD_table[,16]*sqrt((DBD_table[,15]/(1-DBD_table[,14]))^2+(DBD_table[,19]/DBD_table[,18])^2)
+  }
   
 }else{
   DBD_table <- DBD_table[, -c(2,3,6,7,8,9,10,11,12,13), drop = FALSE]
@@ -201,31 +409,53 @@ if (wet_weights ==TRUE & has_debris==FALSE){
   DBD_table[,9]=DBD_table[,2]/DBD_table[,5]
   DBD_table[,10]=DBD_table[,9]*sqrt((DBD_table[,6]/DBD_table[,5])^2+(DBD_table[,3]/DBD_table[,2])^2)
   
-  if (has_debris==TRUE){
-    DBD_table <- DBD_table[, -c(7,8), drop = FALSE]
-  }
+  constant_density = readline(prompt = "Do you assume constant particle density? (True or False) ")
+  if (constant_density==TRUE){
   has_particle_density = readline(prompt = "Do you have a measured particle density? (True or False) ")
   if (has_particle_density==TRUE){
     particle_density= as.numeric(readline(prompt = "Enter Particle Density (g/cm^3) "))
     particle_density_uncer= as.numeric(readline(prompt = "Enter Particle Density Uncertainty (g/cm^3) "))
   }else{
-    has_clay = readline(prompt = "Do you have a percent clay? (True or False) ")
+    has_clay = readline(prompt = "Do you have a weight percent clay and organic matter? (True or False) ")
     if (has_clay==TRUE){
       clay_per=as.numeric(readline(prompt = "Enter Clay Percentage (%) "))
-      particle_density=2.652+0.216*(clay_per/100)
+      OM_per=as.numeric(readline(prompt = "Enter OM Percentage (%) "))
+      particle_density=2.652+0.216*(clay_per/100)-2.237*(OM_per/100)
       particle_density_uncer=0.041
     }
     particle_density=2.65
     print("default Particle Density used, 2.65 g/cm^3")
     particle_density_uncer=0.1
   }
-  if (has_debris==TRUE){
-    #don't execute porosity calculations
   }else{
+    has_particle_density = readline(prompt = "Do you have measured particle densities? (True or False) ")
+    if (has_particle_density==TRUE){
+      DBD_table=cbind(DBD_table, "Particle Density (g/cm^3)", "Particle Density Uncertainty (g/cm^3)")
+      print("select particle density data")
+      file_path=file.choose()
+      density_dat=read_excel(file_path, col_names = TRUE, col_types = "numeric", .name_repair = "unique_quiet")
+      DBD_table[,11]=density_dat[,1]
+      DBD_table[,12]=density_dat[,2]
+    }else{
+      print("select clay and organic matter data")
+      file_path=file.choose()
+      clay_OM_dat=read_excel(file_path, col_names = TRUE, col_types = "numeric", .name_repair = "unique_quiet")
+      DBD_table=cbind(DBD_table, "Particle Density (g/cm^3)", "Particle Density Uncertainty (g/cm^3)", "Clay Weight Percent (%)", "OM Weight Percent (%)")
+      DBD_table[,13]=density_dat[,1]
+      DBD_table[,14]=density_dat[,2]
+      DBD_table[,11]=DBD_table[,18]=2.652+0.216*(DBD_table[,13]/100)-2.237*(DBD_table[,14]/100)
+      DBD_table[,12]=0.041
+    }
+  }
+  if (constant_density==TRUE){
     DBD_table[,7]=1-(DBD_table[,9]/particle_density)
     DBD_table[,8]=DBD_table[,7]*sqrt((particle_density_uncer/particle_density)^2+(DBD_table[,10]/DBD_table[,9])^2)
+  }else{
+    DBD_table[,7]=1-(DBD_table[,9]/DBD_table[,11])
+    DBD_table[,8]=DBD_table[,7]*sqrt((DBD_table[,12]/DBD_table[,11])^2+(DBD_table[,10]/DBD_table[,9])^2)
+    }
   }
-}
+
 # Fill missing uncertainties by bracketing nearest known uncertainty values
 propagate_uncertainty_linear <- function(u) {
   n <- length(u)
@@ -261,7 +491,7 @@ if ("Dry Bulk Density (g/cm^3)" %in% names(DBD_table) &&
     anyNA(DBD_table$`Dry Bulk Density (g/cm^3)`)) {
   
   ans <- tolower(trimws(readline(
-    prompt = "Do you want to interpolate missing DBD and Porosity values? (TRUE/FALSE) "
+    prompt = "Do you want to interpolate missing DBD and Porosity values? (True or False) "
   )))
   do_it <- isTRUE(as.logical(ans))
   
@@ -299,16 +529,17 @@ dir.create(new_folder_path, showWarnings = FALSE)
 # Navigate into the new directory
 setwd(new_folder_path)
 # Save the data frame as a CSV file in the new folder
-write.csv(DBD_table, "dbd_results.csv", row.names = FALSE, na = "")
+writexl::write_xlsx(DBD_table, "dbd_results.xlsx")
 
 pdf("DBD_plot.pdf", width = 8, height = 6)
 
 DBD_plot=ggplot(DBD_table, aes(x = `Dry Bulk Density (g/cm^3)`, y = `Mid Depth z(i) (cm)`)) +
   geom_point() +
-  geom_errorbarh(
+  geom_errorbar(
     aes(xmin = `Dry Bulk Density (g/cm^3)` - `Dry Bulk Density Uncertainty (g/cm^3)`,
         xmax = `Dry Bulk Density (g/cm^3)` + `Dry Bulk Density Uncertainty (g/cm^3)`),
-    height = 0
+    width = 0,
+    orientation = "y"
   ) +
   scale_y_reverse() +
   labs(
@@ -319,6 +550,7 @@ DBD_plot=ggplot(DBD_table, aes(x = `Dry Bulk Density (g/cm^3)`, y = `Mid Depth z
   theme_minimal()
 
 print(DBD_plot)
+
 dev.off()
 
 if ("Porosity" %in% names(DBD_table)) {
@@ -326,10 +558,11 @@ pdf("Porosity_plot.pdf", width = 8, height = 6)
 
 Porosity_plot=ggplot(DBD_table, aes(x = `Porosity`, y = `Mid Depth z(i) (cm)`)) +
   geom_point() +
-  geom_errorbarh(
+  geom_errorbar(
     aes(xmin = `Porosity` - `Porosity Uncertainty`,
         xmax = `Porosity` + `Porosity Uncertainty`),
-    height = 0
+    width = 0,
+    orientation = "y"
   ) +
   scale_y_reverse() +
   labs(
@@ -372,8 +605,14 @@ if (exists("interval_thicknesses_list")) {
 }
 
 constants_table$value[[6]] <- core_length
-constants_table$value[[7]] <- particle_density
-constants_table$value[[8]] <- particle_density_uncer
+if (constant_density==TRUE){
+  constants_table$value[[7]] <- particle_density
+  constants_table$value[[8]] <- particle_density_uncer
+}else{
+  constants_table$value[[7]] <- "variable"
+  constants_table$value[[8]] <- "variable"
+}
+
 
 # 4) Make a CSV-friendly copy (so write.csv still works cleanly)
 constants_table_csv <- constants_table
@@ -395,7 +634,7 @@ constants_table_csv$value <- vapply(
   character(1)
 )
 
-write.csv(constants_table, "constants_table", row.names=FALSE)
+writexl::write_xlsx(constants_table_csv, "constants_table.xlsx")
 
 
 save.image(file = "DBD_environment.RData")
