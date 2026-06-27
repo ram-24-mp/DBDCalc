@@ -2,7 +2,7 @@
 # https://github.com/ram-24-mp/DBDCalc
 
 # script startup
-script_version <- "1.0"
+script_version <- "1.1"
 
 required_packages <- c(
   "jsonlite",
